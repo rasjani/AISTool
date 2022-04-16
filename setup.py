@@ -1,31 +1,58 @@
 from setuptools import setup, find_packages
 from subprocess import check_output
+from pathlib import Path
+import os
+from importlib.util import module_from_spec, spec_from_file_location
 
-try:
-    current_version = check_output(
-        ['git', 'describe', '--tags']).rstrip().decode()
-    print(current_version)
-except Exception as e:
-    current_version = 'g' + check_output(
-        ['git', 'log', '-1', '--format=%h']).rstrip().decode()
+NAME="AISTool"
+CWD = Path(__file__).parent
+requirements_file = CWD / "requirements.txt"
+readme_file = CWD / "README.md"
+# Get requirements
+with requirements_file.open(encoding="utf-8") as f:
+    REQUIREMENTS = f.read().splitlines()
+
+# Get the long description from the README file
+with readme_file.open(encoding="utf-8") as f:
+    long_description = f.read()
+
+CLASSIFIERS = """
+Development Status :: 3 - Alpha
+Operating System :: OS Independent
+Programming Language :: Python
+Programming Language :: Python :: 3
+Programming Language :: Python :: 3.7
+Programming Language :: Python :: 3.8
+Programming Language :: Python :: 3.9
+""".strip().splitlines()
+
+def get_version_and_cmdclass(pkg_path):
+    spec = spec_from_file_location("version", os.path.join(pkg_path, "_version.py"))
+    module = module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.__version__, module.get_cmdclass(pkg_path)
+
+
+version, cmdclass = get_version_and_cmdclass(r".")
 
 setup(
-    name="ansible-inventory-to-ssh-config",
-    version=current_version,
+    name=f"{NAME}",
+    version=version,
+    cmdclass=cmdclass,
     description="Generate ssh config file from Ansible inventory",
-    author="Yioda",
-    author_email='jyc180g@gmail.com',
-    url="https://github.com/yioda/ansible-inventory-to-ssh-config",
-    packages=find_packages(),
+    long_description=long_description,
+    long_description_content_type="text/markdown",
+    author="Jani Mikkonen",
+    author_email="jani.mikkonen@gmail.com",
+    url="https://github.com/rasjani/AISTool",
+    license="MIT",
+    classifiers=CLASSIFIERS,
+    packages=[NAME],
     entry_points={
         'console_scripts': [
-            'ansible-inventory-to-ssh-config=src.main:main',
-            'aitsc=src.main:main'
+            f'{NAME}=AISTool.main:main'
         ],
     },
-    install_requires=[
-        'ansible>=2.10.7',
-        'sshconf==0.2.2'
-    ],
-    python_requires=">=3"
+    install_requires=REQUIREMENTS,
+    python_requires=">=3.7"
 )
