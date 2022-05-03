@@ -26,12 +26,19 @@ def get_args():
     parser.add_argument("-u", "--user", help="overwrite ansible_user", default=None)
     parser.add_argument("-i", "--identityfile", help="Add external identity file", default=None, type=Path)
     parser.add_argument("-d", "--dry-run", help="show new configurations without updating file", action="store_true")
-    parser.add_argument("--without-backup", help="update without backup", action="store_true", default=False)
+
+    parser.add_argument('--backup', help="Make a backup of modified output file", action='store_true')
+    parser.add_argument('--no-backup', action='store_false')
+    parser.set_defaults(backup=True)
+
+    parser.add_argument('--forwardagent', help="Enable ssh ForwardAgent option", action='store_true')
+    parser.add_argument('--no-forwardagent', action='store_false')
+    parser.set_defaults(forwardagent=True)
 
     return parser.parse_args()
 
 
-def update_ssh_config(ssh_config, inventories, variables, group="all", user=None, identity=None):
+def update_ssh_config(ssh_config, inventories, variables, group="all", user=None, identity=None, forwardagent=False):
     def _get_key(vars, keynames):
         value = vars.get(keynames[0], vars.get(keynames[1], None))
         if not value:
@@ -73,6 +80,9 @@ def update_ssh_config(ssh_config, inventories, variables, group="all", user=None
             # Field is not mandatory, no need to do error handling
             pass
 
+        fa_map = {True: 'yes', False: 'no'}
+        ssh_config_options["ForwardAgent"] = fa_map[forwardagent]
+
         try:
             ssh_config.set(host_name, **ssh_config_options)
         except ValueError:
@@ -89,7 +99,7 @@ def print_ssh_config(ssh_config):
         print(h, ssh_config.host(h))
 
 
-def ansible_inventory_to_ssh_config(inventory_file, output, dry_run=False, with_backup=True, group="all", user=None, identity=None):
+def ansible_inventory_to_ssh_config(inventory_file, output, dry_run=False, with_backup=True, group="all", user=None, identity=None, forwardagent=False):
     print(f"Inventory: {inventory_file}")
     print(f"Target: {output}")
 
@@ -99,7 +109,7 @@ def ansible_inventory_to_ssh_config(inventory_file, output, dry_run=False, with_
 
     try:
         ssh_config = read_ssh_config(output)
-        update_ssh_config(ssh_config, inventories, variables, group, user, identity)
+        update_ssh_config(ssh_config, inventories, variables, group, user, identity, forwardagent)
 
         if with_backup:
             backup(output)
@@ -110,7 +120,7 @@ def ansible_inventory_to_ssh_config(inventory_file, output, dry_run=False, with_
             ssh_config.save()
     except FileNotFoundError:
         ssh_config = empty_ssh_config_file()
-        update_ssh_config(ssh_config, inventories, variables, group, user, identity)
+        update_ssh_config(ssh_config, inventories, variables, group, user, identity, forwardagent)
 
         if dry_run:
             print_ssh_config(ssh_config)
@@ -122,5 +132,5 @@ def ansible_inventory_to_ssh_config(inventory_file, output, dry_run=False, with_
 def main():
     args = get_args()
     ansible_inventory_to_ssh_config(
-        args.inventory_file, args.output.expanduser(), args.dry_run, not args.without_backup, args.group, args.user, args.identityfile
+        args.inventory_file, args.output.expanduser(), args.dry_run, args.backup, args.group, args.user, args.identityfile, args.forwardagent
     )
